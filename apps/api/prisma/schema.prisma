@@ -1,0 +1,364 @@
+// Prisma schema for PulseWorks Marketing SaaS
+// Multi-tenant architecture with strict account isolation
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ===== CORE TENANT & AUTH MODELS =====
+
+model Account {
+  id            String   @id @default(cuid())
+  name          String
+  websiteUrl    String?
+  plan          Plan     @default(ESSENTIAL)
+  postingAddon  Boolean  @default(false)
+  timezone      String   @default("Pacific/Auckland")
+  stripeCustomerId String? @unique
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  // Relations
+  users               User[]
+  socialConnections   SocialConnection[]
+  publishingProfile   PublishingProfile?
+  brandProfile        BrandProfile?
+  monthlyBriefs       MonthlyBrief[]
+  contentItems        ContentItem[]
+  postingRule         PostingRule?
+  scheduleItems       ScheduleItem[]
+  auditEvents         AuditEvent[]
+
+  @@index([plan])
+  @@index([stripeCustomerId])
+}
+
+model User {
+  id           String   @id @default(cuid())
+  accountId    String
+  email        String   @unique
+  name         String?
+  role         UserRole @default(OWNER)
+  passwordHash String?
+  googleId     String?  @unique
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  // Relations
+  account                 Account        @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  createdBriefs           MonthlyBrief[] @relation("BriefCreator")
+  approvedContent         ContentItem[]  @relation("ContentApprover")
+  verifiedPublishingProfiles PublishingProfile[] @relation("ProfileVerifier")
+  auditEvents             AuditEvent[]
+
+  @@index([accountId])
+  @@index([email])
+}
+
+// ===== SOCIAL CONNECTIONS & PUBLISHING =====
+
+model SocialConnection {
+  id                  String   @id @default(cuid())
+  accountId           String
+  provider            String   // "ayrshare"
+  platform            Platform // "FACEBOOK" | "INSTAGRAM"
+  providerProfileId   String   // Ayrshare profile ID
+  platformAccountId   String?  // FB Page ID or IG Business Account ID
+  platformAccountName String?  // Display name
+  platformHandle      String?  // @username for IG
+  profilePicUrl       String?
+  accessToken         String?  @db.Text // Encrypted or from provider
+  status              ConnectionStatus @default(ACTIVE)
+  connectedAt         DateTime @default(now())
+  lastCheckedAt       DateTime @default(now())
+  metadata            Json?    // Extra provider data
+
+  account Account @relation(fields: [accountId], references: [id], onDelete: Cascade)
+
+  @@unique([accountId, platform])
+  @@index([accountId, status])
+  @@index([providerProfileId])
+}
+
+model PublishingProfile {
+  id                  String   @id @default(cuid())
+  accountId           String   @unique
+  facebookProfileId   String?  // Frozen Ayrshare profile ID for FB
+  instagramProfileId  String?  // Frozen Ayrshare profile ID for IG
+  facebookPageName    String?
+  facebookPageId      String?
+  instagramHandle     String?
+  instagramAccountId  String?
+  status              PublishingStatus @default(PENDING_VERIFICATION)
+  verifiedAt          DateTime?
+  verifiedByUserId    String?
+
+  account      Account @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  verifiedBy   User?   @relation("ProfileVerifier", fields: [verifiedByUserId], references: [id])
+
+  @@index([accountId])
+  @@index([status])
+}
+
+// ===== BRAND INTELLIGENCE =====
+
+model BrandProfile {
+  id                String   @id @default(cuid())
+  accountId         String   @unique
+  websiteUrl        String
+  toneKeywords      Json     // Array of strings: ["professional", "approachable", "expert"]
+  brandVoiceRules   Json     // Object: { do: [...], dont: [...] }
+  visualStyle       Json     // Object: { colors: [...], mood: "..." }
+  audienceSummary   String   @db.Text
+  contentPillars    Json     // Array of strings: ["Education", "Client success", "Industry insights"]
+  confidenceScore   Int      @default(3) // 1-5, higher = more refined
+  source            BrandProfileSource @default(AUTO)
+  notes             String?  @db.Text // Internal notes for manual refinement
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  account Account @relation(fields: [accountId], references: [id], onDelete: Cascade)
+
+  @@index([accountId])
+  @@index([confidenceScore])
+}
+
+// ===== CONTENT GENERATION & MANAGEMENT =====
+
+model MonthlyBrief {
+  id              String   @id @default(cuid())
+  accountId       String
+  month           DateTime // First day of month
+  primaryFocus    Focus
+  secondaryFocus  Focus?
+  promoEnabled    Boolean  @default(false)
+  promoText       String?  @db.Text
+  tone            Tone     @default(NEUTRAL)
+  notes           String?  @db.Text
+  createdByUserId String
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  account   Account       @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  createdBy User          @relation("BriefCreator", fields: [createdByUserId], references: [id])
+  content   ContentItem[]
+
+  @@unique([accountId, month])
+  @@index([accountId, month])
+}
+
+model ContentItem {
+  id                String      @id @default(cuid())
+  accountId         String
+  monthlyBriefId    String?
+  month             DateTime    // First day of month
+  type              ContentType @default(POST)
+  title             String
+  caption           String      @db.Text
+  hashtags          Json        // Array of strings
+  mediaUrl          String?
+  mediaType         MediaType?
+  platformTargets   Json        // Array of Platform enums ["FACEBOOK", "INSTAGRAM"]
+  status            ContentStatus @default(DRAFT)
+  approvedByUserId  String?
+  approvedAt        DateTime?
+  editCount         Int         @default(0)
+  createdAt         DateTime    @default(now())
+  updatedAt         DateTime    @updatedAt
+
+  account      Account       @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  monthlyBrief MonthlyBrief? @relation(fields: [monthlyBriefId], references: [id], onDelete: SetNull)
+  approvedBy   User?         @relation("ContentApprover", fields: [approvedByUserId], references: [id])
+  scheduleItems ScheduleItem[]
+
+  @@index([accountId, month])
+  @@index([accountId, status])
+  @@index([monthlyBriefId])
+}
+
+// ===== SCHEDULING & POSTING =====
+
+model PostingRule {
+  id           String   @id @default(cuid())
+  accountId    String   @unique
+  frequency    Frequency @default(TWICE_WEEKLY)
+  daysOfWeek   Json     // Array of day numbers [1,3,5] (1=Mon, 7=Sun)
+  timeWindow   TimeWindow @default(MORNING)
+  fixedTime    String?  // HH:MM format if custom time
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  account Account @relation(fields: [accountId], references: [id], onDelete: Cascade)
+
+  @@index([accountId])
+}
+
+model ScheduleItem {
+  id                String         @id @default(cuid())
+  accountId         String
+  contentItemId     String
+  platform          Platform
+  scheduledFor      DateTime
+  providerProfileId String         // FROZEN at schedule time
+  providerJobId     String?        // From Ayrshare
+  providerPostId    String?        // From Ayrshare after publish
+  postUrl           String?        // Direct link to published post
+  status            ScheduleStatus @default(QUEUED)
+  errorMessage      String?        @db.Text
+  createdAt         DateTime       @default(now())
+  updatedAt         DateTime       @updatedAt
+
+  account     Account     @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  contentItem ContentItem @relation(fields: [contentItemId], references: [id], onDelete: Cascade)
+
+  @@index([accountId, scheduledFor])
+  @@index([accountId, status])
+  @@index([scheduledFor, status])
+  @@index([providerJobId])
+}
+
+// ===== AUDIT & LOGGING =====
+
+model AuditEvent {
+  id         String   @id @default(cuid())
+  accountId  String
+  userId     String?
+  eventType  EventType
+  entityType String   // "ContentItem", "ScheduleItem", "SocialConnection", etc.
+  entityId   String?
+  metadata   Json?    // Additional context
+  createdAt  DateTime @default(now())
+
+  account Account @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  user    User?   @relation(fields: [userId], references: [id])
+
+  @@index([accountId, createdAt])
+  @@index([accountId, eventType])
+  @@index([entityType, entityId])
+}
+
+// ===== ENUMS =====
+
+enum Plan {
+  ESSENTIAL
+  GROWTH
+  AUTHORITY
+}
+
+enum UserRole {
+  OWNER
+  ADMIN
+  MEMBER
+}
+
+enum Platform {
+  FACEBOOK
+  INSTAGRAM
+}
+
+enum ConnectionStatus {
+  ACTIVE
+  EXPIRED
+  RECONNECT_NEEDED
+  DISCONNECTED
+}
+
+enum PublishingStatus {
+  PENDING_VERIFICATION
+  VERIFIED
+  NEEDS_RECONNECT
+}
+
+enum Focus {
+  NEW_CLIENTS
+  PROMOTE_SERVICE
+  EDUCATION
+  SEASONAL
+}
+
+enum Tone {
+  NEUTRAL
+  EDUCATIONAL
+  PROMOTIONAL
+}
+
+enum ContentType {
+  POST
+  PROMO
+}
+
+enum MediaType {
+  IMAGE
+  VIDEO
+}
+
+enum ContentStatus {
+  DRAFT
+  APPROVED
+  SKIPPED
+  SCHEDULED
+  PUBLISHED
+  FAILED
+}
+
+enum Frequency {
+  TWICE_WEEKLY
+  THREE_WEEKLY
+  CUSTOM
+}
+
+enum TimeWindow {
+  MORNING
+  AFTERNOON
+  EVENING
+  CUSTOM
+}
+
+enum ScheduleStatus {
+  QUEUED
+  SCHEDULED
+  PUBLISHED
+  FAILED
+  CANCELLED
+}
+
+enum BrandProfileSource {
+  AUTO
+  MANUAL_OVERRIDE
+}
+
+enum EventType {
+  // Auth & Account
+  USER_CREATED
+  USER_LOGIN
+  ACCOUNT_CREATED
+  // Brand Intelligence
+  BRAND_PROFILE_CREATED
+  BRAND_PROFILE_UPDATED
+  // Connections
+  SOCIAL_CONNECTED
+  SOCIAL_DISCONNECTED
+  PUBLISHING_VERIFIED
+  // Content
+  BRIEF_CREATED
+  BRIEF_UPDATED
+  CONTENT_GENERATED
+  CONTENT_APPROVED
+  CONTENT_EDITED
+  CONTENT_SKIPPED
+  // Scheduling
+  POSTS_SCHEDULED
+  SCHEDULE_CANCELLED
+  // Publishing
+  POST_PUBLISHED
+  POST_FAILED
+  // Billing
+  SUBSCRIPTION_CREATED
+  SUBSCRIPTION_UPDATED
+  SUBSCRIPTION_CANCELLED
+}
