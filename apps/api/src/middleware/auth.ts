@@ -2,7 +2,9 @@ import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 import { prisma } from '../db/client';
 
-const JWT_SECRET = process.env.JWT_SECRET || process.env.NEXTAUTH_SECRET || 'dev-secret-change-me';
+// Use NEXTAUTH_SECRET as the single source of truth
+// This is the same secret used by NextAuth for session tokens
+const JWT_SECRET = process.env.NEXTAUTH_SECRET || 'dev-secret-change-me';
 
 export interface AuthRequest extends Request {
   userId?: string;

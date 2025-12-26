@@ -6,7 +6,8 @@ import { signUpSchema, signInSchema } from '@shared/types';
 import { logAuditEvent } from '../utils/audit';
 
 const router = Router();
-const JWT_SECRET = process.env.JWT_SECRET || process.env.NEXTAUTH_SECRET || 'dev-secret-change-me';
+// Use NEXTAUTH_SECRET as the single source of truth
+const JWT_SECRET = process.env.NEXTAUTH_SECRET || 'dev-secret-change-me';
 
 // Sign up
 router.post('/signup', async (req, res, next) => {

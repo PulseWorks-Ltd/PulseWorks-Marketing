@@ -15,7 +15,7 @@ datasource db {
 model Account {
   id            String   @id @default(cuid())
   name          String
-  websiteUrl    String?
+  websiteUrl    String   // Required for brand profile generation
   plan          Plan     @default(ESSENTIAL)
   postingAddon  Boolean  @default(false)
   timezone      String   @default("Pacific/Auckland")

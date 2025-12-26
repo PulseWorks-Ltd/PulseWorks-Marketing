@@ -1,32 +1,25 @@
 // API client utility for making requests to the Express backend
+// Now uses NextAuth session tokens instead of manual JWT management
+
+import { getSession } from 'next-auth/react';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
 export class ApiClient {
   private baseUrl: string;
-  private token: string | null = null;
 
   constructor() {
     this.baseUrl = API_URL;
-
-    // Load token from localStorage (client-side only)
-    if (typeof window !== 'undefined') {
-      this.token = localStorage.getItem('auth_token');
-    }
   }
 
-  setToken(token: string) {
-    this.token = token;
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('auth_token', token);
+  // Get API token from NextAuth session
+  private async getToken(): Promise<string | null> {
+    if (typeof window === 'undefined') {
+      return null; // Server-side - no session available
     }
-  }
 
-  clearToken() {
-    this.token = null;
-    if (typeof window !== 'undefined') {
-      localStorage.removeItem('auth_token');
-    }
+    const session = await getSession();
+    return (session as any)?.apiToken || null;
   }
 
   private async request<T>(
@@ -38,13 +31,16 @@ export class ApiClient {
       ...options.headers,
     };
 
-    if (this.token) {
-      headers['Authorization'] = `Bearer ${this.token}`;
+    // Get token from NextAuth session
+    const token = await this.getToken();
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
     }
 
     const response = await fetch(`${this.baseUrl}${endpoint}`, {
       ...options,
       headers,
+      credentials: 'include', // Include cookies for session
     });
 
     if (!response.ok) {

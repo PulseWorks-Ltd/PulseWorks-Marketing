@@ -1,36 +1,14 @@
 import 'dotenv/config';
-import { Queue, Worker, Job } from 'bullmq';
+import { Worker, Job } from 'bullmq';
 import IORedis from 'ioredis';
 import { prisma } from '../db/client';
 import { ayrshareClient } from '../services/ayrshare';
 import { logAuditEvent } from '../utils/audit';
+import { PublishPostJob } from '../services/queue';
 
 // Redis connection
 const connection = new IORedis(process.env.REDIS_URL || 'redis://localhost:6379', {
   maxRetriesPerRequest: null,
-});
-
-// Define job types
-interface PublishPostJob {
-  scheduleItemId: string;
-}
-
-// Create queue
-export const publishQueue = new Queue<PublishPostJob>('publish-posts', {
-  connection,
-  defaultJobOptions: {
-    attempts: 3,
-    backoff: {
-      type: 'exponential',
-      delay: 60000, // 1 minute
-    },
-    removeOnComplete: {
-      count: 100, // Keep last 100 completed jobs
-    },
-    removeOnFail: {
-      count: 500, // Keep last 500 failed jobs
-    },
-  },
 });
 
 // Create worker
@@ -179,53 +157,9 @@ worker.on('failed', (job, err) => {
   console.error(`Job ${job?.id} failed:`, err);
 });
 
-// Scheduler to check for posts that need publishing
-async function schedulePublishJobs() {
-  console.log('Checking for posts to publish...');
-
-  const now = new Date();
-  const fiveMinutesFromNow = new Date(now.getTime() + 5 * 60 * 1000);
-
-  // Find schedule items that should be published soon
-  const itemsToPublish = await prisma.scheduleItem.findMany({
-    where: {
-      status: 'QUEUED',
-      scheduledFor: {
-        gte: now,
-        lte: fiveMinutesFromNow,
-      },
-    },
-  });
-
-  for (const item of itemsToPublish) {
-    // Calculate delay until scheduled time
-    const delay = item.scheduledFor.getTime() - now.getTime();
-
-    await publishQueue.add(
-      'publish-post',
-      { scheduleItemId: item.id },
-      {
-        delay: Math.max(0, delay),
-        jobId: `publish-${item.id}`, // Prevent duplicates
-      }
-    );
-
-    // Mark as scheduled
-    await prisma.scheduleItem.update({
-      where: { id: item.id },
-      data: { status: 'SCHEDULED' },
-    });
-
-    console.log(`Queued publish job for ${item.id} with delay ${delay}ms`);
-  }
-}
-
-// Run scheduler every minute
-setInterval(schedulePublishJobs, 60 * 1000);
-schedulePublishJobs(); // Run immediately on start
-
 console.log('🚀 Posting worker started');
 console.log('📊 Connected to Redis:', process.env.REDIS_URL || 'redis://localhost:6379');
+console.log('✅ Jobs are enqueued immediately when schedules are created (no polling)');
 
 // Graceful shutdown
 process.on('SIGTERM', async () => {

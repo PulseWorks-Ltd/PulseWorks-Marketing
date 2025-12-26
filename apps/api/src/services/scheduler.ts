@@ -3,6 +3,7 @@ import { Platform } from '@prisma/client';
 import { startOfMonth, endOfMonth, addDays, setHours, setMinutes, isBefore, isAfter } from 'date-fns';
 import { utcToZonedTime, zonedTimeToUtc } from 'date-fns-tz';
 import { TIME_WINDOWS } from '@shared/types';
+import { enqueuePublishJob } from './queue';
 
 export interface ScheduleRequest {
   accountId: string;
@@ -118,7 +119,9 @@ export class Scheduler {
       }
     }
 
-    // 7. Create schedule items in database
+    // 7. Create schedule items in database and enqueue jobs immediately
+    const createdItems: string[] = [];
+
     await prisma.$transaction(async (tx) => {
       // Delete existing schedules for these content items
       await tx.scheduleItem.deleteMany({
@@ -130,7 +133,7 @@ export class Scheduler {
 
       // Create new schedule items
       for (const item of scheduleItems) {
-        await tx.scheduleItem.create({
+        const created = await tx.scheduleItem.create({
           data: {
             accountId: request.accountId,
             contentItemId: item.contentItemId,
@@ -141,6 +144,8 @@ export class Scheduler {
           },
         });
 
+        createdItems.push(created.id);
+
         // Update content item status
         await tx.contentItem.update({
           where: { id: item.contentItemId },
@@ -148,6 +153,14 @@ export class Scheduler {
         });
       }
     });
+
+    // 8. Enqueue BullMQ jobs immediately (outside transaction for safety)
+    for (let i = 0; i < createdItems.length; i++) {
+      const scheduleItemId = createdItems[i];
+      const scheduledFor = scheduleItems[i].scheduledFor;
+
+      await enqueuePublishJob(scheduleItemId, scheduledFor);
+    }
 
     return {
       scheduled: scheduleItems.length,
