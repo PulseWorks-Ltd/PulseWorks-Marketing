@@ -1,6 +1,13 @@
 # Nixpacks configuration for Next.js web frontend
 # Builds only web workspace without API dependencies (no canvas)
 
+[variables]
+NPM_CONFIG_PRODUCTION = 'false'
+
+# Disable auto-detection providers
+[providers]
+node = false
+
 [phases.setup]
 nixPkgs = ['nodejs_22']
 
@@ -8,7 +15,14 @@ nixPkgs = ['nodejs_22']
 cmds = ['npm install --workspace=packages/shared --workspace=web --include-workspace-root']
 
 [phases.build]
-cmds = ['npm run build --workspace=web']
+# Explicitly disable auto-detection by using our own build command
+cmds = [
+  'npm run build --workspace=web'
+]
+
+# Explicitly set build command to prevent pnpm auto-detection
+[build]
+cmd = 'npm run build --workspace=web'
 
 [start]
 cmd = 'npm run start --workspace=web'
