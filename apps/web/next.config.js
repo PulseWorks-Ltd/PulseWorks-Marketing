@@ -2,6 +2,7 @@
 const nextConfig = {
   reactStrictMode: true,
   transpilePackages: ['@shared/types'],
+  output: 'standalone', // Enable standalone mode for Docker
   images: {
     domains: ['via.placeholder.com'], // Add your S3/R2 domain here
   },

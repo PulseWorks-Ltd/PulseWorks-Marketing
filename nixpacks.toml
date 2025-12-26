@@ -1,15 +1,11 @@
 # Nixpacks configuration for Next.js web frontend
-# This builds ONLY the web workspace without API dependencies (canvas, etc.)
+# Builds only web workspace without API dependencies (no canvas)
 
 [phases.setup]
-nixPkgs = ['nodejs_22', 'npm-9_x']
+nixPkgs = ['nodejs_22']
 
 [phases.install]
-# Install only web and shared workspace dependencies (no API/canvas deps)
-cmds = [
-  'npm install --workspace=packages/shared --include-workspace-root',
-  'npm install --workspace=web'
-]
+cmds = ['npm install --workspace=packages/shared --workspace=web --include-workspace-root']
 
 [phases.build]
 cmds = ['npm run build --workspace=web']
