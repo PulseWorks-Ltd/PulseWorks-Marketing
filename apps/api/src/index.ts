@@ -14,8 +14,10 @@ import brandProfileRoutes from './routes/brandProfile';
 import contentRoutes from './routes/content';
 import scheduleRoutes from './routes/schedule';
 import socialRoutes from './routes/social';
-import billingRoutes from './routes/billing';
+import billingRoutes from './routes/billing_new'; // PostLoop billing
+import usageRoutes from './routes/usage'; // PostLoop usage tracking
 import webhookRoutes from './routes/webhooks';
+import stripeWebhookRoutes from './routes/webhooks_stripe'; // PostLoop Stripe webhooks
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -30,6 +32,7 @@ app.use(cors({
 }));
 
 // Webhook routes BEFORE body parser (Stripe requires raw body)
+app.use('/api/webhooks/stripe', express.raw({ type: 'application/json' }), stripeWebhookRoutes);
 app.use('/api/webhooks', webhookRoutes);
 
 // Body parser middleware
@@ -53,6 +56,7 @@ app.use('/api/content', contentRoutes);
 app.use('/api/schedule', scheduleRoutes);
 app.use('/api/social', socialRoutes);
 app.use('/api/billing', billingRoutes);
+app.use('/api/usage', usageRoutes);
 
 // Error handling
 app.use(errorHandler);
