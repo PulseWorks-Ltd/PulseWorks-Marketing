@@ -1,20 +1,30 @@
 // Shared types across web and API
 
-export type Plan = 'ESSENTIAL' | 'GROWTH' | 'AUTHORITY';
+export type Plan = 'STARTER' | 'GROWTH' | 'PRO';
 export type Platform = 'FACEBOOK' | 'INSTAGRAM';
 export type Focus = 'NEW_CLIENTS' | 'PROMOTE_SERVICE' | 'EDUCATION' | 'SEASONAL';
 export type Tone = 'NEUTRAL' | 'EDUCATIONAL' | 'PROMOTIONAL';
-export type ContentType = 'POST' | 'PROMO';
+export type ContentType = 'STATIC' | 'VIDEO'; // Changed from POST/PROMO to STATIC/VIDEO
 export type ContentStatus = 'DRAFT' | 'APPROVED' | 'SKIPPED' | 'SCHEDULED' | 'PUBLISHED' | 'FAILED';
 export type Frequency = 'TWICE_WEEKLY' | 'THREE_WEEKLY' | 'CUSTOM';
 export type TimeWindow = 'MORNING' | 'AFTERNOON' | 'EVENING' | 'CUSTOM';
 export type ScheduleStatus = 'QUEUED' | 'SCHEDULED' | 'PUBLISHED' | 'FAILED' | 'CANCELLED';
 
 export interface PlanLimits {
-  postsPerMonth: number;
-  promosPerMonth: number;
-  editsPerMonth: number;
+  staticPostsPerMonth: number;
+  videosPerMonth: number;
+  autoposting: boolean;
+  imageUploads: boolean;
   price: number;
+}
+
+// Usage tracking for billing periods
+export interface UsageCounter {
+  staticUsed: number;
+  videoUsed: number;
+  autopostUsed: number;
+  periodStart: Date;
+  periodEnd: Date;
 }
 
 export interface BrandProfile {

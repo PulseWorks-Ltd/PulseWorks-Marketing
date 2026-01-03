@@ -1,6 +1,6 @@
 {
-  "name": "pulseworks-marketing",
-  "version": "0.1.0",
+  "name": "postloop",
+  "version": "1.0.0",
   "private": true,
   "workspaces": [
     "apps/*",

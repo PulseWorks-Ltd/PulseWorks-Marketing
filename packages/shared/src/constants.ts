@@ -1,27 +1,37 @@
 import type { PlanLimits } from './types';
 
+// PostLoop Pricing Tiers
 export const PLAN_LIMITS: Record<string, PlanLimits> = {
-  ESSENTIAL: {
-    postsPerMonth: 8,
-    promosPerMonth: 1,
-    editsPerMonth: 3,
-    price: 249,
+  STARTER: {
+    staticPostsPerMonth: 8,
+    videosPerMonth: 0,
+    autoposting: false,
+    imageUploads: false,
+    price: 39,
   },
   GROWTH: {
-    postsPerMonth: 18,
-    promosPerMonth: 2,
-    editsPerMonth: 8,
-    price: 449,
+    staticPostsPerMonth: 12,
+    videosPerMonth: 4,
+    autoposting: true,
+    imageUploads: true,
+    price: 99,
   },
-  AUTHORITY: {
-    postsPerMonth: 30,
-    promosPerMonth: 3,
-    editsPerMonth: 15,
-    price: 799,
+  PRO: {
+    staticPostsPerMonth: 30,
+    videosPerMonth: 16,
+    autoposting: true,
+    imageUploads: true,
+    price: 249,
   },
 };
 
-export const POSTING_ADDON_PRICE = 249;
+// Add-ons
+export const STARTER_AUTOPOST_ADDON_PRICE = 30;
+export const STARTER_AUTOPOST_CAP = 8; // Max auto-posts per month for Starter + addon
+
+// One-time purchases
+export const ONE_TIME_STATIC_PRICE = 5;
+export const ONE_TIME_VIDEO_PRICE = 19;
 
 export const DEFAULT_TIMEZONE = 'Pacific/Auckland';
 

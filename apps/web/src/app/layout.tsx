@@ -6,8 +6,8 @@ import { Providers } from '@/components/Providers';
 const inter = Inter({ subsets: ['latin'] });
 
 export const metadata: Metadata = {
-  title: 'PulseWorks Marketing - Social Media Content Automation',
-  description: 'AI-powered social media content generation and scheduling for NZ businesses',
+  title: 'PostLoop - AI Marketing Automation for Small Business',
+  description: 'Create and schedule social media content effortlessly. Website scans, generated posts, auto-posting to Facebook and Instagram.',
 };
 
 export default function RootLayout({

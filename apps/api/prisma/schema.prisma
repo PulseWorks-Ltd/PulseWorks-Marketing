@@ -15,11 +15,16 @@ datasource db {
 model Account {
   id            String   @id @default(cuid())
   name          String
-  websiteUrl    String   // Required for brand profile generation
-  plan          Plan     @default(ESSENTIAL)
-  postingAddon  Boolean  @default(false)
+  websiteUrl    String   // Required for business profile generation
+  plan          Plan     @default(STARTER)
+  autopostAddon Boolean  @default(false) // Starter autopost add-on
   timezone      String   @default("Pacific/Auckland")
   stripeCustomerId String? @unique
+  stripeSubscriptionId String? @unique
+  subscriptionStatus String? // active, trialing, past_due, canceled, etc.
+  trialEndsAt   DateTime?
+  currentPeriodStart DateTime?
+  currentPeriodEnd   DateTime?
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 
@@ -33,9 +38,11 @@ model Account {
   postingRule         PostingRule?
   scheduleItems       ScheduleItem[]
   auditEvents         AuditEvent[]
+  usageCounter        UsageCounter?
 
   @@index([plan])
   @@index([stripeCustomerId])
+  @@index([stripeSubscriptionId])
 }
 
 model User {
@@ -222,6 +229,25 @@ model ScheduleItem {
   @@index([providerJobId])
 }
 
+// ===== USAGE TRACKING =====
+
+model UsageCounter {
+  id         String   @id @default(cuid())
+  accountId  String   @unique
+  staticUsed Int      @default(0) // Static posts created this period
+  videoUsed  Int      @default(0) // Videos created this period
+  autopostUsed Int    @default(0) // Auto-posts scheduled this period
+  periodStart DateTime
+  periodEnd  DateTime
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  account Account @relation(fields: [accountId], references: [id], onDelete: Cascade)
+
+  @@index([accountId])
+  @@index([periodEnd])
+}
+
 // ===== AUDIT & LOGGING =====
 
 model AuditEvent {
@@ -245,9 +271,9 @@ model AuditEvent {
 // ===== ENUMS =====
 
 enum Plan {
-  ESSENTIAL
+  STARTER
   GROWTH
-  AUTHORITY
+  PRO
 }
 
 enum UserRole {
@@ -288,8 +314,8 @@ enum Tone {
 }
 
 enum ContentType {
-  POST
-  PROMO
+  STATIC
+  VIDEO
 }
 
 enum MediaType {
